@@ -1,0 +1,48 @@
+import sys
+from pathlib import Path
+
+import streamlit as st
+
+sys.path.append(str(Path(__file__).resolve().parents[1]))
+from lib import get_cached_retriever, run_picker
+
+from rag_os.embedding import embedder_registry
+from rag_os.evaluation.manual_review import save_rating
+from rag_os.storage.db import loads
+
+st.set_page_config(page_title="Retrieval · RAG-OS", page_icon="🔎", layout="wide")
+st.title("🔎 Retrieval Playground")
+st.caption("Run a query against a saved run's retriever and rate the results.")
+
+run = run_picker(key="retrieval_run")
+if run:
+    st.markdown(f"**Retriever used:** `{run.retriever_name}`  ·  embedder: `{run.embedder_name}`")
+
+    top_k = st.slider("top_k", min_value=1, max_value=20, value=5)
+    query = st.text_input("Query")
+
+    if query:
+        with st.spinner("Embedding query + retrieving..."):
+            retriever = get_cached_retriever(run.id)
+            embedder = embedder_registry.create(run.embedder_name, **loads(run.embedder_params))
+            query_vector = embedder.embed_query(query)
+            results = retriever.retrieve(query_vector, top_k=top_k, query_text=query)
+
+        if not results:
+            st.warning("No results returned.")
+        else:
+            for r in results:
+                with st.container(border=True):
+                    st.markdown(f"**Rank {r.rank + 1}**  ·  score `{r.score:.4f}`  ·  chunk `{r.chunk_id}`")
+                    st.write(r.text)
+
+            st.divider()
+            st.subheader("Rate this query's results")
+            col1, col2 = st.columns(2)
+            note = st.text_input("Note (optional)", key="rating_note")
+            if col1.button("👍 Good results", use_container_width=True):
+                save_rating(run.id, query, thumbs_up=True, note=note)
+                st.success("Saved.")
+            if col2.button("👎 Bad results", use_container_width=True):
+                save_rating(run.id, query, thumbs_up=False, note=note)
+                st.success("Saved.")

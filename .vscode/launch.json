@@ -1,0 +1,34 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Streamlit: Run RAG-OS App",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "streamlit",
+      "args": ["run", "${workspaceFolder}/app/Home.py"],
+      "env": { "PYTHONPATH": "${workspaceFolder}/src" },
+      "justMyCode": true,
+      "console": "integratedTerminal"
+    },
+    {
+      "name": "Python: Current File",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${file}",
+      "env": { "PYTHONPATH": "${workspaceFolder}/src" },
+      "console": "integratedTerminal",
+      "justMyCode": true
+    },
+    {
+      "name": "Python: Pytest (all tests)",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "pytest",
+      "args": ["${workspaceFolder}/tests", "-v"],
+      "env": { "PYTHONPATH": "${workspaceFolder}/src" },
+      "console": "integratedTerminal",
+      "justMyCode": true
+    }
+  ]
+}

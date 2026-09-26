@@ -1,0 +1,126 @@
+"""
+Orchestrates parse -> chunk -> embed -> index for one run, then persists every
+intermediate artifact so it can be inspected/compared later in the UI.
+
+This is the one place that's allowed to import from parsing, chunking, embedding,
+retrieval AND storage - every other module stays decoupled from its siblings.
+"""
+from __future__ import annotations
+
+from pathlib import Path
+
+from rag_os.chunking import chunker_registry
+from rag_os.chunking.semantic import SemanticChunker
+from rag_os.core.types import Chunk, Document, RunConfig
+from rag_os.embedding import embedder_registry
+from rag_os.parsing import parser_for_file
+from rag_os.retrieval import retriever_registry
+from rag_os.retrieval.base import Retriever
+from rag_os.storage.db import (
+    ChunkRow,
+    DocumentRow,
+    EmbeddingRow,
+    RunRow,
+    dumps,
+    get_session,
+)
+
+
+def run_dataset_generation(
+    file_paths: list[str | Path],
+    config: RunConfig,
+) -> tuple[RunRow, list[Document], list[Chunk], Retriever]:
+    """
+    Runs the full pipeline for one RunConfig over a batch of uploaded files, persists
+    the run + documents + chunks + embeddings to SQLite, and returns a ready-to-query
+    Retriever instance for immediate use in the same session.
+    """
+    embedder = embedder_registry.create(config.embedder_name, **config.embedder_params)
+
+    # Semantic chunking needs an embedder injected; every other chunker just takes its params.
+    if config.chunker_name == "semantic":
+        chunker = SemanticChunker(embed_fn=embedder.embed, **config.chunker_params)
+    else:
+        chunker = chunker_registry.create(config.chunker_name, **config.chunker_params)
+
+    retriever = retriever_registry.create(config.retriever_name, **config.retriever_params)
+
+    documents: list[Document] = [parser_for_file(fp).parse(fp) for fp in file_paths]
+
+    all_chunks: list[Chunk] = []
+    for doc in documents:
+        all_chunks.extend(chunker.chunk(doc))
+
+    vectors = embedder.embed([c.text for c in all_chunks]) if all_chunks else []
+
+    retriever.build(all_chunks, vectors)
+
+    _persist_run(config, documents, all_chunks, vectors)
+
+    return _run_row(config), documents, all_chunks, retriever
+
+
+def _run_row(config: RunConfig) -> RunRow:
+    return RunRow(
+        id=config.id,
+        name=config.name,
+        parser_name=config.parser_name,
+        parser_params=dumps(config.parser_params),
+        chunker_name=config.chunker_name,
+        chunker_params=dumps(config.chunker_params),
+        embedder_name=config.embedder_name,
+        embedder_params=dumps(config.embedder_params),
+        retriever_name=config.retriever_name,
+        retriever_params=dumps(config.retriever_params),
+        created_at=config.created_at,
+    )
+
+
+def _persist_run(
+    config: RunConfig,
+    documents: list[Document],
+    chunks: list[Chunk],
+    vectors: list[list[float]],
+) -> None:
+    with get_session() as session:
+        session.add(_run_row(config))
+
+        for doc in documents:
+            session.add(
+                DocumentRow(
+                    id=doc.id,
+                    run_id=config.id,
+                    source_filename=doc.source_filename,
+                    text=doc.text,
+                    metadata_json=dumps(doc.metadata),
+                    parser_name=doc.parser_name,
+                    created_at=doc.created_at,
+                )
+            )
+
+        for chunk, vector in zip(chunks, vectors):
+            session.add(
+                ChunkRow(
+                    id=chunk.id,
+                    run_id=config.id,
+                    document_id=chunk.document_id,
+                    text=chunk.text,
+                    position=chunk.position,
+                    char_start=chunk.char_start,
+                    char_end=chunk.char_end,
+                    metadata_json=dumps(chunk.metadata),
+                    chunker_name=chunk.chunker_name,
+                )
+            )
+            session.add(
+                EmbeddingRow(
+                    id=f"{chunk.id}_emb",
+                    run_id=config.id,
+                    chunk_id=chunk.id,
+                    vector_json=dumps(vector),
+                    dim=len(vector),
+                    embedder_name=config.embedder_name,
+                )
+            )
+
+        session.commit()
