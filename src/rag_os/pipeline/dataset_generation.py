@@ -24,12 +24,14 @@ from rag_os.storage.db import (
     dumps,
     get_session,
 )
+from rag_os.reranking import reranker_registry
+from rag_os.reranking.base import Reranker
 
 
 def run_dataset_generation(
     file_paths: list[str | Path],
     config: RunConfig,
-) -> tuple[RunRow, list[Document], list[Chunk], Retriever]:
+) -> tuple[RunRow, list[Document], list[Chunk], Retriever, Reranker | None]:
     """
     Runs the full pipeline for one RunConfig over a batch of uploaded files, persists
     the run + documents + chunks + embeddings to SQLite, and returns a ready-to-query
@@ -55,9 +57,15 @@ def run_dataset_generation(
 
     retriever.build(all_chunks, vectors)
 
+    reranker = (
+        reranker_registry.create(config.reranker_name, **config.reranker_params)
+        if config.reranker_name
+        else None
+    )
+
     _persist_run(config, documents, all_chunks, vectors)
 
-    return _run_row(config), documents, all_chunks, retriever
+    return _run_row(config), documents, all_chunks, retriever, reranker
 
 
 def _run_row(config: RunConfig) -> RunRow:
@@ -72,9 +80,10 @@ def _run_row(config: RunConfig) -> RunRow:
         embedder_params=dumps(config.embedder_params),
         retriever_name=config.retriever_name,
         retriever_params=dumps(config.retriever_params),
+        reranker_name=config.reranker_name,
+        reranker_params=dumps(config.reranker_params),
         created_at=config.created_at,
     )
-
 
 def _persist_run(
     config: RunConfig,

@@ -1,3 +1,4 @@
+"""LEGACY - unchanged, kept for old runs. New pipelines use generators/dense_vector.py."""
 from __future__ import annotations
 
 from rag_os.core.types import Chunk, RetrievalResult
@@ -47,7 +48,6 @@ class FaissFlatRetriever(Retriever):
             if idx == -1:
                 continue
             chunk = self._chunks[idx]
-            # Convert L2 distance to a similarity-like score (smaller distance = higher score).
             score = 1.0 / (1.0 + float(dist))
             results.append(
                 RetrievalResult(

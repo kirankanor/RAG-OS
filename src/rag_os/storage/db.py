@@ -27,6 +27,9 @@ class RunRow(SQLModel, table=True):
     retriever_name: str = ""
     retriever_params: str = "{}"
     created_at: str = ""
+    reranker_name: str = ""
+    reranker_params: str = "{}"
+    created_at: str = ""
 
 
 class DocumentRow(SQLModel, table=True):

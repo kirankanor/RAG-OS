@@ -4,7 +4,7 @@ from pathlib import Path
 import streamlit as st
 
 sys.path.append(str(Path(__file__).resolve().parents[1]))
-from lib import get_cached_retriever, run_picker
+from lib import get_cached_retriever_and_reranker, run_picker
 
 from rag_os.embedding import embedder_registry
 from rag_os.evaluation.manual_review import save_rating
@@ -16,17 +16,23 @@ st.caption("Run a query against a saved run's retriever and rate the results.")
 
 run = run_picker(key="retrieval_run")
 if run:
-    st.markdown(f"**Retriever used:** `{run.retriever_name}`  ·  embedder: `{run.embedder_name}`")
+    st.markdown(
+        f"**Retriever used:** `{run.retriever_name}`  ·  embedder: `{run.embedder_name}`"
+        + (f"  ·  reranker: `{run.reranker_name}`" if run.reranker_name else "")
+    )
 
     top_k = st.slider("top_k", min_value=1, max_value=20, value=5)
     query = st.text_input("Query")
 
     if query:
         with st.spinner("Embedding query + retrieving..."):
-            retriever = get_cached_retriever(run.id)
+            retriever, reranker = get_cached_retriever_and_reranker(run.id)
             embedder = embedder_registry.create(run.embedder_name, **loads(run.embedder_params))
             query_vector = embedder.embed_query(query)
-            results = retriever.retrieve(query_vector, top_k=top_k, query_text=query)
+            fetch_k = top_k * 3 if reranker else top_k
+            results = retriever.retrieve(query_vector, top_k=fetch_k, query_text=query)
+            if reranker:
+                results = reranker.rerank(query, results, top_k=top_k)
 
         if not results:
             st.warning("No results returned.")

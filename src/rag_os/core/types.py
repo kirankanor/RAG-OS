@@ -85,3 +85,6 @@ class RunConfig:
     retriever_name: str = ""
     retriever_params: dict[str, Any] = field(default_factory=dict)
     created_at: str = field(default_factory=_utcnow)
+    reranker_name: str = ""
+    reranker_params: dict[str, Any] = field(default_factory=dict)
+    created_at: str = field(default_factory=_utcnow)

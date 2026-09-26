@@ -18,9 +18,12 @@ from rag_os.storage.db import (
     get_session,
     loads,
 )
+from rag_os.reranking import reranker_registry
+from rag_os.reranking.base import Reranker
 
 
-def load_retriever_for_run(run_id: str) -> Retriever:
+
+def load_retriever_for_run(run_id: str) -> tuple[Retriever, Reranker | None]:
     run = get_run(run_id)
     if run is None:
         raise ValueError(f"No run found with id '{run_id}'")
@@ -54,7 +57,13 @@ def load_retriever_for_run(run_id: str) -> Retriever:
     retriever_params = loads(run.retriever_params)
     retriever = retriever_registry.create(run.retriever_name, **retriever_params)
     retriever.build(chunks, vectors)
-    return retriever
+
+    reranker = (
+        reranker_registry.create(run.reranker_name, **loads(run.reranker_params))
+        if run.reranker_name
+        else None
+    )
+    return retriever, reranker
 
 
 def delete_run(run_id: str) -> None:

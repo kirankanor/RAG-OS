@@ -1,3 +1,8 @@
+"""
+LEGACY - kept unchanged so existing runs (created before the Path-B pipeline
+refactor) still load via run_manager.load_retriever_for_run(). New runs should
+use retrieval/pipeline_runner.py + retrieval/pipeline_step.py instead.
+"""
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
@@ -7,7 +12,7 @@ from rag_os.core.types import Chunk, RetrievalResult
 
 
 class Retriever(ABC):
-    """Interface every retrieval strategy must implement.
+    """Interface every (legacy) retrieval strategy must implement.
 
     Usage pattern: build() once per run (with the chunks + their embeddings for that run),
     then retrieve() as many times as you want with different queries.

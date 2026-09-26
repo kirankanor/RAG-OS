@@ -14,6 +14,7 @@ from rag_os.storage.db import RunRow, list_runs, loads
 
 
 EXAMPLE_PARAMS: dict[str, dict] = {
+    "code_aware": {"max_chunk_size": 1500},
     "fixed_size": {"chunk_size": 1000, "overlap": 100},
     "recursive_char": {"chunk_size": 1000, "overlap": 150},
     "sentence_window": {"sentences_per_chunk": 5, "sentence_overlap": 1},
@@ -24,7 +25,9 @@ EXAMPLE_PARAMS: dict[str, dict] = {
     "cohere_embed_v3": {"model": "embed-english-v3.0"},
     "faiss_flat_l2": {},
     "qdrant": {"collection_name": "rag_os_experiment", "url": "http://localhost:6333"},
-    "hybrid_bm25_vector": {"alpha": 0.5},
+    "hybrid_bm25_vector": {"alpha": 0.5, "fusion_method": "rrf", "rrf_k": 60},
+    "cross_encoder": {"model_name": "cross-encoder/ms-marco-MiniLM-L-6-v2"},
+    "cohere_rerank": {"model": "rerank-english-v3.0"},
 }
 
 def run_label(run: RunRow) -> str:
@@ -79,7 +82,7 @@ def strategy_picker(kind: str, registry, key_prefix: str) -> tuple[str, dict]:
 
 
 @st.cache_resource(show_spinner="Loading retriever for this run...")
-def get_cached_retriever(run_id: str):
+def get_cached_retriever_and_reranker(run_id: str):
     return load_retriever_for_run(run_id)
 
 
@@ -95,5 +98,7 @@ def config_from_run(run: RunRow) -> RunConfig:
         embedder_params=loads(run.embedder_params),
         retriever_name=run.retriever_name,
         retriever_params=loads(run.retriever_params),
+        reranker_name=run.reranker_name,
+        reranker_params=loads(run.reranker_params),
         created_at=run.created_at,
     )

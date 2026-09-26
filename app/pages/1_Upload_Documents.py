@@ -10,6 +10,7 @@ from rag_os.parsing.base import DEFAULT_STRATEGY_BY_EXTENSION
 from rag_os.pipeline import run_dataset_generation
 from rag_os.retrieval import retriever_registry
 from rag_os.storage.file_store import save_upload
+from rag_os.reranking import reranker_registry
 
 sys.path.append(str(Path(__file__).resolve().parents[1]))
 from lib import strategy_picker
@@ -39,13 +40,19 @@ if uploaded_files:
 
 
 st.subheader("Your decisions")
-col1, col2, col3 = st.columns(3)
+col1, col2, col3, col4 = st.columns(4)
 with col1:
     chunker_name, chunker_params = strategy_picker("chunking", chunker_registry, "chunker")
 with col2:
     embedder_name, embedder_params = strategy_picker("embedding", embedder_registry, "embedder")
 with col3:
     retriever_name, retriever_params = strategy_picker("retrieval", retriever_registry, "retriever")
+with col4:
+    use_reranker = st.checkbox("Add a reranking stage", value=False)
+    if use_reranker:
+        reranker_name, reranker_params = strategy_picker("reranking", reranker_registry, "reranker")
+    else:
+        reranker_name, reranker_params = "", {}
 
 if chunker_name == "semantic":
     st.info("Semantic chunking uses the embedder above and costs extra embedding calls.", icon="ℹ️")
@@ -55,6 +62,7 @@ with st.expander("📋 Review your run before executing", expanded=True):
         "chunker": {"name": chunker_name, "params": chunker_params},
         "embedder": {"name": embedder_name, "params": embedder_params},
         "retriever": {"name": retriever_name, "params": retriever_params},
+        "reranker": {"name": reranker_name, "params": reranker_params} if reranker_name else None,
     })
 
 st.divider()
@@ -70,6 +78,8 @@ if st.button("▶️ Run pipeline", type="primary", disabled=not uploaded_files)
         embedder_params=embedder_params,
         retriever_name=retriever_name,
         retriever_params=retriever_params,
+        reranker_name=reranker_name,
+        reranker_params=reranker_params,
     )
 
     with st.spinner("Saving uploads..."):
@@ -79,7 +89,7 @@ if st.button("▶️ Run pipeline", type="primary", disabled=not uploaded_files)
 
     try:
         with st.spinner("Parsing → chunking → embedding → indexing..."):
-            run_row, documents, chunks, retriever = run_dataset_generation(saved_paths, config)
+            run_row, documents, chunks, retriever, reranker = run_dataset_generation(saved_paths, config)
     except Exception as e:  # noqa: BLE001
         st.error(f"Pipeline failed: {e}")
     else:

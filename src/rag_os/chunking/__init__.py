@@ -2,6 +2,8 @@
 Importing this package registers every chunking strategy with `chunker_registry`.
 """
 from rag_os.chunking import (  # noqa: F401
+    contextual,
+    code_aware,
     fixed_size,
     markdown_aware,
     recursive_char,

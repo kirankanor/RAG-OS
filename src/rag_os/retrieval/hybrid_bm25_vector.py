@@ -1,3 +1,6 @@
+"""LEGACY - unchanged (includes the RRF fusion_method added earlier this session),
+kept for old runs. New pipelines split this into generators/bm25.py + 
+generators/dense_vector.py + fusers/fuse.py, composed independently."""
 from __future__ import annotations
 
 from rag_os.core.types import Chunk, RetrievalResult
@@ -7,15 +10,20 @@ from rag_os.retrieval.base import Retriever, retriever_registry
 @retriever_registry.register(
     "hybrid_bm25_vector",
     "Combines lexical BM25 scoring (good for exact keyword/name matches) with dense "
-    "vector similarity (good for paraphrase/semantic matches) via a weighted score fusion. "
-    "Often beats either alone. Requires the 'local' extra (rank-bm25 + numpy).",
+    "vector similarity (good for paraphrase/semantic matches) via a weighted score fusion "
+    "or reciprocal rank fusion (RRF). Often beats either alone. Requires the 'local' "
+    "extra (rank-bm25 + numpy).",
 )
 class HybridBm25VectorRetriever(Retriever):
     name = "hybrid_bm25_vector"
 
-    def __init__(self, alpha: float = 0.5):
-        """alpha: weight on the vector score; (1 - alpha) goes to BM25. 0.5 = equal blend."""
+    def __init__(self, alpha: float = 0.5, fusion_method: str = "weighted", rrf_k: int = 60):
+        """alpha: weight on vector score in 'weighted' fusion; ignored for 'rrf'.
+        fusion_method: 'weighted' (score blend) or 'rrf' (reciprocal rank fusion,
+        recommended when BM25 and vector scores aren't on comparable scales)."""
         self.alpha = alpha
+        self.fusion_method = fusion_method
+        self.rrf_k = rrf_k
         self._chunks: list[Chunk] = []
         self._vectors: list[list[float]] = []
         self._bm25 = None
@@ -49,21 +57,38 @@ class HybridBm25VectorRetriever(Retriever):
             return [0.0 for _ in scores]
         return [(s - lo) / (hi - lo) for s in scores]
 
+    @staticmethod
+    def _ranks(scores: list[float]) -> list[int]:
+        """Rank 0 = highest score."""
+        order = sorted(range(len(scores)), key=lambda i: scores[i], reverse=True)
+        ranks = [0] * len(scores)
+        for r, i in enumerate(order):
+            ranks[i] = r
+        return ranks
+
     def retrieve(
         self, query_vector: list[float], top_k: int = 5, query_text: str = ""
     ) -> list[RetrievalResult]:
         if self._bm25 is None:
             raise RuntimeError("Call build() before retrieve().")
 
-        bm25_scores = self._normalize(list(self._bm25.get_scores(query_text.lower().split())))
-        vector_scores = self._normalize(
-            [self._cosine(query_vector, v) for v in self._vectors]
-        )
+        bm25_raw = list(self._bm25.get_scores(query_text.lower().split()))
+        vector_raw = [self._cosine(query_vector, v) for v in self._vectors]
 
-        combined = [
-            self.alpha * v_score + (1 - self.alpha) * b_score
-            for v_score, b_score in zip(vector_scores, bm25_scores)
-        ]
+        if self.fusion_method == "rrf":
+            bm25_ranks = self._ranks(bm25_raw)
+            vector_ranks = self._ranks(vector_raw)
+            combined = [
+                1.0 / (self.rrf_k + bm25_ranks[i]) + 1.0 / (self.rrf_k + vector_ranks[i])
+                for i in range(len(self._chunks))
+            ]
+        else:
+            bm25_scores = self._normalize(bm25_raw)
+            vector_scores = self._normalize(vector_raw)
+            combined = [
+                self.alpha * v + (1 - self.alpha) * b
+                for v, b in zip(vector_scores, bm25_scores)
+            ]
 
         ranked = sorted(enumerate(combined), key=lambda x: x[1], reverse=True)[:top_k]
         results: list[RetrievalResult] = []

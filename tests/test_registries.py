@@ -15,7 +15,7 @@ def test_parser_registry_has_expected_strategies():
 
 def test_chunker_registry_has_expected_strategies():
     names = chunker_registry.names()
-    for expected in ["fixed_size", "recursive_char", "sentence_window", "markdown_aware", "semantic"]:
+    for expected in ["fixed_size", "recursive_char", "sentence_window", "markdown_aware", "semantic" , "code_aware"]:
         assert expected in names
 
 

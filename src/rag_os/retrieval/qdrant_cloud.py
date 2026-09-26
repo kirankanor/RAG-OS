@@ -1,3 +1,4 @@
+"""LEGACY - unchanged, kept for old runs. New pipelines use generators/qdrant_dense.py."""
 from __future__ import annotations
 
 import uuid
