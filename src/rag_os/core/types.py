@@ -1,7 +1,7 @@
 """
 Shared data types passed between modules. Keeping these in `core` (instead of inside
-each module) is what lets parsing/chunking/embedding/retrieval stay decoupled from
-each other while still speaking a common language.
+each module) is what lets ingestion/retrieval/generation stay decoupled from each
+other while still speaking a common language.
 """
 from __future__ import annotations
 
@@ -43,6 +43,10 @@ class Chunk:
     char_end: int = 0
     metadata: dict[str, Any] = field(default_factory=dict)
     chunker_name: str = ""
+    # Set by a two-tier chunker to point at a larger enclosing chunk's id.
+    # Consumed by retrieval/expanders/expand.py's parent_document_expand step;
+    # no chunker sets this yet, so that step is a no-op until one does.
+    parent_chunk_id: str = ""
 
 
 @dataclass
@@ -84,7 +88,6 @@ class RunConfig:
     embedder_params: dict[str, Any] = field(default_factory=dict)
     retriever_name: str = ""
     retriever_params: dict[str, Any] = field(default_factory=dict)
-    created_at: str = field(default_factory=_utcnow)
     reranker_name: str = ""
     reranker_params: dict[str, Any] = field(default_factory=dict)
     created_at: str = field(default_factory=_utcnow)

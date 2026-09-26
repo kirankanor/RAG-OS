@@ -2,21 +2,21 @@
 Orchestrates parse -> chunk -> embed -> index for one run, then persists every
 intermediate artifact so it can be inspected/compared later in the UI.
 
-This is the one place that's allowed to import from parsing, chunking, embedding,
-retrieval AND storage - every other module stays decoupled from its siblings.
+This is the one place that's allowed to import from ingestion, retrieval AND
+database - every other module stays decoupled from its siblings.
 """
 from __future__ import annotations
 
 from pathlib import Path
 
-from rag_os.chunking import chunker_registry
-from rag_os.chunking.semantic import SemanticChunker
+from rag_os.ingestion.chunking import chunker_registry
+from rag_os.ingestion.chunking.semantic import SemanticChunker
 from rag_os.core.types import Chunk, Document, RunConfig
-from rag_os.embedding import embedder_registry
-from rag_os.parsing import parser_for_file
+from rag_os.ingestion.embedding import embedder_registry
+from rag_os.ingestion.parsing import parser_for_file
 from rag_os.retrieval import retriever_registry
 from rag_os.retrieval.base import Retriever
-from rag_os.storage.db import (
+from rag_os.database.db import (
     ChunkRow,
     DocumentRow,
     EmbeddingRow,
@@ -24,8 +24,8 @@ from rag_os.storage.db import (
     dumps,
     get_session,
 )
-from rag_os.reranking import reranker_registry
-from rag_os.reranking.base import Reranker
+from rag_os.retrieval.rerankers import reranker_registry
+from rag_os.retrieval.rerankers.base import Reranker
 
 
 def run_dataset_generation(

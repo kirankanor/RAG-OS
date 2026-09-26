@@ -9,7 +9,7 @@ from lib import run_label
 
 from rag_os.evaluation.manual_review import run_score_summary
 from rag_os.pipeline.run_manager import delete_run
-from rag_os.storage.db import list_runs
+from rag_os.database.db import list_runs
 
 st.set_page_config(page_title="Reports · RAG-OS", page_icon="📊", layout="wide")
 st.title("📊 Reports — Compare Runs")

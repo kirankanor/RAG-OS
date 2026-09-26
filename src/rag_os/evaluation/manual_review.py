@@ -6,7 +6,7 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 
-from rag_os.storage.db import RatingRow, get_session
+from rag_os.database.db import RatingRow, get_session
 
 
 def save_rating(run_id: str, query: str, thumbs_up: bool, note: str = "") -> None:

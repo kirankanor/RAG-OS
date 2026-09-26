@@ -1,8 +1,8 @@
 """
-Thin PipelineStep wrappers around the Reranker classes already in reranking/
-(cross_encoder.py, cohere_rerank.py). Kept as adapters rather than moved, so the
-existing reranking/ package + Reranker interface (still used by the pre-Path-B
-retriever_name/reranker_name flow) keeps working unmodified during migration.
+Thin PipelineStep wrappers around the (legacy) Reranker classes in this same
+package (cross_encoder.py, cohere_rerank.py). Kept as adapters rather than
+merged into one implementation, so the Reranker interface (still used by the
+pre-Path-B retriever_name/reranker_name flow) keeps working unmodified.
 """
 from __future__ import annotations
 
@@ -31,15 +31,15 @@ def _reorder_candidates(candidates: list[Candidate], reranked_results: list[Retr
 
 @pipeline_step_registry.register(
     "cross_encoder_rerank",
-    "Pipeline-step wrapper around reranking.cross_encoder.CrossEncoderReranker (local "
-    "sentence-transformers cross-encoder). Requires the 'local' extra.",
+    "Pipeline-step wrapper around retrieval.rerankers.cross_encoder.CrossEncoderReranker "
+    "(local sentence-transformers cross-encoder). Requires the 'local' extra.",
 )
 class CrossEncoderRerankStep(PipelineStep):
     name = "cross_encoder_rerank"
     category = "reranker"
 
     def __init__(self, model_name: str = "cross-encoder/ms-marco-MiniLM-L-6-v2"):
-        from rag_os.reranking.cross_encoder import CrossEncoderReranker
+        from rag_os.retrieval.rerankers.cross_encoder import CrossEncoderReranker
 
         self._reranker = CrossEncoderReranker(model_name=model_name)
 
@@ -54,15 +54,15 @@ class CrossEncoderRerankStep(PipelineStep):
 
 @pipeline_step_registry.register(
     "cohere_rerank",
-    "Pipeline-step wrapper around reranking.cohere_rerank.CohereReranker (Cohere rerank "
-    "API). Requires COHERE_API_KEY and the 'cloud' extra.",
+    "Pipeline-step wrapper around retrieval.rerankers.cohere_rerank.CohereReranker "
+    "(Cohere rerank API). Requires COHERE_API_KEY and the 'cloud' extra.",
 )
 class CohereRerankStep(PipelineStep):
     name = "cohere_rerank"
     category = "reranker"
 
     def __init__(self, model: str = "rerank-english-v3.0", api_key: str | None = None):
-        from rag_os.reranking.cohere_rerank import CohereReranker
+        from rag_os.retrieval.rerankers.cohere_rerank import CohereReranker
 
         self._reranker = CohereReranker(model=model, api_key=api_key)
 

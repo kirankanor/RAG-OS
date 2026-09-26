@@ -1,10 +1,12 @@
 """Sanity tests: every strategy module registers itself correctly and is constructible
 with default params where that's possible without network/API access."""
-from rag_os.chunking import chunker_registry
+from rag_os.ingestion.chunking import chunker_registry
 from rag_os.core.types import Document
-from rag_os.embedding import embedder_registry
-from rag_os.parsing import parser_registry
-from rag_os.retrieval import retriever_registry
+from rag_os.ingestion.embedding import embedder_registry
+from rag_os.ingestion.parsing import parser_registry
+from rag_os.retrieval import retriever_registry, pipeline_step_registry
+from rag_os.retrieval.rerankers import reranker_registry
+from rag_os.generation import generator_registry
 
 
 def test_parser_registry_has_expected_strategies():
@@ -15,7 +17,7 @@ def test_parser_registry_has_expected_strategies():
 
 def test_chunker_registry_has_expected_strategies():
     names = chunker_registry.names()
-    for expected in ["fixed_size", "recursive_char", "sentence_window", "markdown_aware", "semantic" , "code_aware"]:
+    for expected in ["fixed_size", "recursive_char", "sentence_window", "markdown_aware", "semantic", "code_aware"]:
         assert expected in names
 
 
@@ -29,6 +31,28 @@ def test_retriever_registry_has_expected_strategies():
     names = retriever_registry.names()
     for expected in ["faiss_flat_l2", "qdrant", "hybrid_bm25_vector"]:
         assert expected in names
+
+
+def test_reranker_registry_has_expected_strategies():
+    names = reranker_registry.names()
+    for expected in ["cross_encoder", "cohere_rerank"]:
+        assert expected in names
+
+
+def test_pipeline_step_registry_has_expected_strategies():
+    names = pipeline_step_registry.names()
+    for expected in [
+        "dense_flat", "dense_hnsw", "bm25", "qdrant_dense",
+        "rrf_fuse", "weighted_fuse", "metadata_filter",
+        "parent_document_expand", "sentence_window_expand",
+        "mmr", "cross_encoder_rerank", "cohere_rerank",
+    ]:
+        assert expected in names
+
+
+def test_generator_registry_has_expected_strategies():
+    names = generator_registry.names()
+    assert "groq_chat" in names
 
 
 def test_fixed_size_chunker_produces_chunks():

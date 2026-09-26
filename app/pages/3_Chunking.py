@@ -7,7 +7,7 @@ from sqlmodel import select
 sys.path.append(str(Path(__file__).resolve().parents[1]))
 from lib import run_picker
 
-from rag_os.storage.db import ChunkRow, get_session
+from rag_os.database.db import ChunkRow, get_session
 
 st.set_page_config(page_title="Chunking · RAG-OS", page_icon="✂️", layout="wide")
 st.title("✂️ Chunking Inspector")

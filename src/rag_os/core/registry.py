@@ -1,5 +1,5 @@
 """
-Generic strategy registry used by every module (parsing, chunking, embedding, retrieval).
+Generic strategy registry used by every module (ingestion, retrieval, generation).
 
 Each module defines its own subclass of Registry (or just instantiates Registry directly)
 and strategy implementations register themselves with a decorator, e.g.:

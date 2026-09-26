@@ -1,9 +1,23 @@
 """
-Importing this package registers every generator step with `pipeline_step_registry`.
-Generators produce candidates from the full indexed chunk set (dense similarity,
-lexical/BM25, or a hosted vector DB) - one or more can be combined in a pipeline,
-merged by a fuser step afterward.
+Importing this package registers every retrieval strategy - the LEGACY
+single-retriever system (`retriever_registry`), used by runs created before
+the Path-B pipeline refactor, and the new composable pipeline
+(`pipeline_step_registry`) - and re-exports the public API both the pipeline
+layer and the UI need. Both systems coexist; nothing here is mutually exclusive.
 """
-from rag_os.retrieval.generators import bm25, dense_vector, qdrant_dense  # noqa: F401
+from rag_os.retrieval import faiss_local, hybrid_bm25_vector, qdrant_cloud  # noqa: F401
+from rag_os.retrieval.base import Retriever, retriever_registry
+from rag_os.retrieval.pipeline_context import Candidate, PipelineContext
+from rag_os.retrieval.pipeline_runner import PipelineStepConfig, run_pipeline
+from rag_os.retrieval.pipeline_step import PipelineStep, pipeline_step_registry
 
-__all__: list[str] = []
+__all__ = [
+    "Retriever",
+    "retriever_registry",
+    "Candidate",
+    "PipelineContext",
+    "PipelineStep",
+    "pipeline_step_registry",
+    "PipelineStepConfig",
+    "run_pipeline",
+]

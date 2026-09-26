@@ -10,7 +10,7 @@ from sqlmodel import select
 from rag_os.core.types import Chunk
 from rag_os.retrieval import retriever_registry
 from rag_os.retrieval.base import Retriever
-from rag_os.storage.db import (
+from rag_os.database.db import (
     ChunkRow,
     EmbeddingRow,
     RunRow,
@@ -18,8 +18,8 @@ from rag_os.storage.db import (
     get_session,
     loads,
 )
-from rag_os.reranking import reranker_registry
-from rag_os.reranking.base import Reranker
+from rag_os.retrieval.rerankers import reranker_registry
+from rag_os.retrieval.rerankers.base import Reranker
 
 
 
@@ -67,7 +67,7 @@ def load_retriever_for_run(run_id: str) -> tuple[Retriever, Reranker | None]:
 
 
 def delete_run(run_id: str) -> None:
-    from rag_os.storage.db import (
+    from rag_os.database.db import (
         ChunkRow,
         DocumentRow,
         EmbeddingRow,

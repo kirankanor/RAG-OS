@@ -7,7 +7,7 @@ from sqlmodel import select
 sys.path.append(str(Path(__file__).resolve().parents[1]))
 from lib import run_picker
 
-from rag_os.storage.db import ChunkRow, EmbeddingRow, get_session, loads
+from rag_os.database.db import ChunkRow, EmbeddingRow, get_session, loads
 
 st.set_page_config(page_title="Embedding · RAG-OS", page_icon="🧮", layout="wide")
 st.title("🧮 Embedding Inspector")

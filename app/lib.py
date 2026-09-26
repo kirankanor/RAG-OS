@@ -10,7 +10,7 @@ import streamlit as st
 
 from rag_os.core.types import RunConfig
 from rag_os.pipeline.run_manager import load_retriever_for_run
-from rag_os.storage.db import RunRow, list_runs, loads
+from rag_os.database.db import RunRow, list_runs, loads
 
 
 EXAMPLE_PARAMS: dict[str, dict] = {

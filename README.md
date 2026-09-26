@@ -1,8 +1,8 @@
 # RAG-OS
 
 A modular monolith for experimenting with RAG pipeline strategies. Upload documents,
-mix and match parsing / chunking / embedding / retrieval strategies, and compare the
-results side by side in a local Streamlit UI.
+mix and match parsing / chunking / embedding / retrieval / reranking / generation
+strategies, and compare the results side by side in a local Streamlit UI.
 
 ## Architecture
 
@@ -10,20 +10,32 @@ Each pipeline stage lives in its own package under `src/rag_os/`, with one abstr
 base interface and several interchangeable strategies that self-register into a
 registry. No module imports its siblings directly — only `src/rag_os/pipeline/`
 (the orchestration layer) and `app/` (the UI) are allowed to know about all of them.
-That's what makes this a "modular monolith": one codebase and one deployable app,
-but internally decoupled enough that adding a new chunker, say, never requires
-touching the embedding or retrieval code.
 
 ```
 src/rag_os/
   core/        shared dataclasses (Document, Chunk, EmbeddingRecord, RunConfig) + Registry
-  parsing/     Parser interface + txt / pdf (x2) / docx / html strategies
-  chunking/    Chunker interface + fixed_size / recursive_char / sentence_window /
-               markdown_aware / semantic strategies
-  embedding/   Embedder interface + local (sentence-transformers) / OpenAI / Cohere strategies
-  retrieval/   Retriever interface + FAISS / Qdrant / hybrid BM25+vector strategies
+  ingestion/
+    parsing/     Parser interface + txt / pdf (x2) / docx / html strategies
+    chunking/    Chunker interface + fixed_size / recursive_char / sentence_window /
+                 markdown_aware / semantic / code_aware / contextual
+    embedding/   Embedder interface + local (sentence-transformers) / OpenAI / Cohere
+  retrieval/
+    base.py, faiss_local.py, qdrant_cloud.py, hybrid_bm25_vector.py   -- legacy,
+      single-retriever-per-run system, still used by runs created before the
+      composable pipeline below existed
+    pipeline_context.py / pipeline_step.py / pipeline_runner.py -- the composable
+      pipeline: an ordered list of independent, user-toggleable PipelineSteps
+    generators/  dense_flat, dense_hnsw, bm25, qdrant_dense -- produce candidates
+    fusers/      rrf_fuse, weighted_fuse -- merge candidates from 2+ generators
+    filters/     metadata_filter -- drop candidates by Chunk.metadata
+    expanders/   parent_document_expand, sentence_window_expand -- attach extra context
+    rerankers/   Reranker interface (legacy) + cross_encoder / cohere_rerank, PLUS
+      the same strategies wrapped as PipelineSteps (mmr, cross_encoder_rerank,
+      cohere_rerank) for the composable pipeline. Both systems live here together.
+  generation/  Generator interface + groq_chat -- final answer synthesis from a
+    query + retrieved chunks, via Groq's chat completions API
   pipeline/    orchestrates parse -> chunk -> embed -> index for one "run", and persists it
-  storage/     SQLite (via SQLModel) for run/document/chunk/embedding/rating rows,
+  database/    SQLite (via SQLModel) for run/document/chunk/embedding/rating rows,
                plus plain-file storage for uploaded files
   evaluation/  manual thumbs-up/down ratings (works now) + recall@k/precision@k/MRR
                metrics (wire in once you have ground-truth query/answer pairs)
@@ -56,15 +68,15 @@ uv sync
 # PyMuPDF parser): 
 uv sync --extra local
 
-# To use cloud strategies (OpenAI/Cohere embedders, Qdrant retriever):
+# To use cloud strategies (OpenAI/Cohere embedders, Qdrant retriever, Groq generator):
 uv sync --extra cloud
 
 # Or both:
 uv sync --extra local --extra cloud
 ```
 
-If you'll use OpenAI, Cohere, or a remote Qdrant instance, copy `.env.example` to
-`.env` and fill in the relevant keys:
+If you'll use OpenAI, Cohere, Groq, or a remote Qdrant instance, copy `.env.example`
+to `.env` and fill in the relevant keys:
 
 ```bash
 cp .env.example .env
@@ -86,30 +98,35 @@ uv run pytest tests/ -v
 uv run ruff check src/ app/
 ```
 
-## VS Code
-
-Open this folder in VS Code — `.vscode/settings.json` points the Python interpreter
-at `.venv` (created by `uv sync`) and enables Ruff as the formatter/linter on save.
-Install the recommended extensions when prompted (Python, Pylance, Ruff).
-
-`.vscode/launch.json` includes three debug configs (Run > Start Debugging, or the
-Run and Debug panel):
-- **Streamlit: Run RAG-OS App** — launches the app under the debugger so you can set
-  breakpoints in any strategy file
-- **Python: Current File** — runs whatever file is open
-- **Python: Pytest (all tests)** — runs the test suite under the debugger
-
 ## Adding a new strategy
 
 Every module follows the same pattern. To add, say, a new chunker:
 
-1. Create `src/rag_os/chunking/my_chunker.py`, subclass `Chunker`, implement `chunk()`,
-   and decorate the class with `@chunker_registry.register("my_chunker", "description")`.
-2. Import it (for its registration side-effect) in `src/rag_os/chunking/__init__.py`.
+1. Create `src/rag_os/ingestion/chunking/my_chunker.py`, subclass `Chunker`, implement
+   `chunk()`, and decorate the class with `@chunker_registry.register("my_chunker", "description")`.
+2. Import it (for its registration side-effect) in `src/rag_os/ingestion/chunking/__init__.py`.
 3. It immediately shows up in the Upload Documents page's chunking strategy dropdown —
    no other code needs to change.
 
-The same pattern applies to `parsing/`, `embedding/`, and `retrieval/`.
+The same pattern applies to `ingestion/parsing/`, `ingestion/embedding/`, `retrieval/rerankers/`
+(legacy `Reranker`) and `generation/` (`Generator`). For a new PipelineStep (generator,
+fuser, filter, expander, or reranker for the composable retrieval pipeline), add the file
+under the matching `retrieval/<category>/` folder, subclass `PipelineStep`, and register
+with `pipeline_step_registry`.
+
+## Retrieval: two systems, by design
+
+`retrieval/` currently has two coexisting systems:
+- **Legacy**: one `retriever_name` (+ optional `reranker_name`) per run — what every
+  existing run in your database uses, loaded via `pipeline/run_manager.py`.
+- **Composable pipeline**: an ordered list of `PipelineStepConfig`s run via
+  `retrieval.run_pipeline(...)` — lets you mix multiple generators, a fuser, filters,
+  expanders, and rerankers in one run instead of picking exactly one retriever.
+
+Nothing forces a migration; both `retriever_registry` and `pipeline_step_registry`
+are populated by importing `rag_os.retrieval`. Wiring the composable pipeline into
+`RunConfig`/the Upload/Retrieval pages (so new runs can use it end-to-end) is not
+done yet — see the project's handoff notes for the remaining steps.
 
 ## Adding automatic metrics
 

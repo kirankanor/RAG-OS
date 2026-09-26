@@ -6,9 +6,9 @@ import streamlit as st
 sys.path.append(str(Path(__file__).resolve().parents[1]))
 from lib import get_cached_retriever_and_reranker, run_picker
 
-from rag_os.embedding import embedder_registry
+from rag_os.ingestion.embedding import embedder_registry
 from rag_os.evaluation.manual_review import save_rating
-from rag_os.storage.db import loads
+from rag_os.database.db import loads
 
 st.set_page_config(page_title="Retrieval · RAG-OS", page_icon="🔎", layout="wide")
 st.title("🔎 Retrieval Playground")

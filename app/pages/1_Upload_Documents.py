@@ -3,14 +3,14 @@ from pathlib import Path
 
 import streamlit as st
 
-from rag_os.chunking import chunker_registry
+from rag_os.ingestion.chunking import chunker_registry
 from rag_os.core.types import RunConfig
-from rag_os.embedding import embedder_registry
-from rag_os.parsing.base import DEFAULT_STRATEGY_BY_EXTENSION
+from rag_os.ingestion.embedding import embedder_registry
+from rag_os.ingestion.parsing.base import DEFAULT_STRATEGY_BY_EXTENSION
 from rag_os.pipeline import run_dataset_generation
 from rag_os.retrieval import retriever_registry
-from rag_os.storage.file_store import save_upload
-from rag_os.reranking import reranker_registry
+from rag_os.database.file_store import save_upload
+from rag_os.retrieval.rerankers import reranker_registry
 
 sys.path.append(str(Path(__file__).resolve().parents[1]))
 from lib import strategy_picker
